@@ -7,7 +7,7 @@ from os.path import basename
 
 
 @dataclass
-class DiffusionBuildConfig(L.BuildConfig):
+class DownloadConfig(L.BuildConfig):
     def build_commands(self):
         return [
             "rm -rf stablediffusion",
@@ -25,7 +25,7 @@ class ModelDownloadWork(L.LightningWork):
 
     def __init__(self, download_repo=True, *args, **kwargs):
         if download_repo:
-            super().__init__(cloud_build_config=DiffusionBuildConfig(), *args, **kwargs)
+            super().__init__(cloud_build_config=DownloadConfig(), *args, **kwargs)
         else:
             super().__init__(*args, **kwargs)
         self.weights_path = None

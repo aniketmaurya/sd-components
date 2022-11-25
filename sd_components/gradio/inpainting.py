@@ -79,7 +79,7 @@ def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1
     start_code = torch.from_numpy(start_code).to(
         device=device, dtype=torch.float32)
 
-    with torch.no_grad(), \
+    with torch.inference_mode(), \
             torch.autocast("cuda"):
         batch = make_batch_sd(image, mask, txt=prompt,
                               device=device, num_samples=num_samples)
@@ -132,31 +132,36 @@ def pad_image(input_image):
         np.pad(np.array(input_image), ((0, pad_h), (0, pad_w), (0, 0)), mode='edge'))
     return im_padded
 
-def predict(sampler, input_image, prompt, ddim_steps, num_samples, scale, seed):
-    init_image = input_image["image"].convert("RGB")
-    init_mask = input_image["mask"].convert("RGB")
-    image = pad_image(init_image) # resize to integer multiple of 32
-    mask = pad_image(init_mask) # resize to integer multiple of 32
-    width, height = image.size
-    print("Inpainting...", width, height)
+class Predict:
+    def __init__(self, sampler) -> None:
+        self.sampler = sampler
 
-    result = inpaint(
-        sampler=sampler,
-        image=image,
-        mask=mask,
-        prompt=prompt,
-        seed=seed,
-        scale=scale,
-        ddim_steps=ddim_steps,
-        num_samples=num_samples,
-        h=height, w=width
-    )
+    def __call__(self, input_image, prompt, ddim_steps, num_samples, scale, seed):
+        init_image = input_image["image"].convert("RGB")
+        init_mask = input_image["mask"].convert("RGB")
+        image = pad_image(init_image) # resize to integer multiple of 32
+        mask = pad_image(init_mask) # resize to integer multiple of 32
+        width, height = image.size
+        print("Inpainting...", width, height)
 
-    return result
+        result = inpaint(
+            sampler=self.sampler,
+            image=image,
+            mask=mask,
+            prompt=prompt,
+            seed=seed,
+            scale=scale,
+            ddim_steps=ddim_steps,
+            num_samples=num_samples,
+            h=height, w=width
+        )
 
-def launch(config, ckpt, port):
+        return result
+
+def launch(config, ckpt, host, port):
 
     sampler = initialize_model(config, ckpt)
+    predict = Predict(sampler=sampler)
 
     block = gr.Blocks().queue()
     with block:
@@ -187,8 +192,8 @@ def launch(config, ckpt, port):
                 gallery = gr.Gallery(label="Generated images", show_label=False).style(
                     grid=[2], height="auto")
 
-        run_button.click(fn=predict, inputs=[sampler, 
+        run_button.click(fn=predict, inputs=[ 
                         input_image, prompt, ddim_steps, num_samples, scale, seed], outputs=[gallery])
 
 
-    block.launch(server_port=port)
+    block.launch(server_name=host, server_port=port)
