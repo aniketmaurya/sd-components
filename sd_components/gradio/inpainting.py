@@ -158,7 +158,7 @@ class Predict:
 
         return result
 
-def launch(config, ckpt, port):
+def launch(config, ckpt, host, port):
 
     sampler = initialize_model(config, ckpt)
     predict = Predict(sampler=sampler)
@@ -196,4 +196,4 @@ def launch(config, ckpt, port):
                         input_image, prompt, ddim_steps, num_samples, scale, seed], outputs=[gallery])
 
 
-    block.launch(server_port=port)
+    block.launch(server_name=host, server_port=port)
