@@ -32,6 +32,8 @@ def initialize_model(config, ckpt):
     device = torch.device(
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
+    if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     sampler = DDIMSampler(model)
 
     return sampler
@@ -139,6 +141,10 @@ class Predict:
     def __call__(self, input_image, prompt, ddim_steps, num_samples, scale, seed):
         init_image = input_image["image"].convert("RGB")
         init_mask = input_image["mask"].convert("RGB")
+
+        init_image.thumbnail((512, 512))
+        init_mask.thumbnail((512, 512))
+
         image = pad_image(init_image) # resize to integer multiple of 32
         mask = pad_image(init_mask) # resize to integer multiple of 32
         width, height = image.size
@@ -155,6 +161,8 @@ class Predict:
             num_samples=num_samples,
             h=height, w=width
         )
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return result
 
