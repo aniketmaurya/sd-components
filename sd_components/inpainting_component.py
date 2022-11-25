@@ -17,7 +17,7 @@ class ModelBuildConfig(L.BuildConfig):
 
 class InpaintingServe(ModelDownloadWork):
     def __init__(self, *args, **kwargs):
-        super().__init__(cloud_compute=L.CloudCompute("gpu-fast"), cloud_build_config=ModelBuildConfig(), download_repo=False, *args, **kwargs)
+        super().__init__(cloud_build_config=ModelBuildConfig(), download_repo=False, *args, **kwargs)
 
     def run(self, *args, **kwargs):
         config_path = "stablediffusion/configs/stable-diffusion/v2-inpainting-inference.yaml"
@@ -25,10 +25,4 @@ class InpaintingServe(ModelDownloadWork):
         super().run(config_path=config_path, weights_url=url)
 
         from sd_components.gradio.inpainting import launch
-        launch(config=config_path, ckpt=self.weights_path, port=self.port)
-    
-    def configure_layout(self):
-        return {"name": "Inpainting", "content": self.url}
-
-component = InpaintingServe()
-app = L.LightningApp(component)
+        launch(config=config_path, ckpt=self.weights_path, host=self.host, port=self.port)
