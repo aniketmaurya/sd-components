@@ -6,7 +6,6 @@ import gradio as gr
 from PIL import Image
 from omegaconf import OmegaConf
 from einops import repeat
-from imwatermark import WatermarkEncoder
 from pathlib import Path
 
 from ldm.models.diffusion.ddim import DDIMSampler
@@ -73,8 +72,7 @@ def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1
 
     print("Creating invisible watermark encoder (see https://github.com/ShieldMnt/invisible-watermark)...")
     wm = "SDV2"
-    wm_encoder = WatermarkEncoder()
-    wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
+    wm_encoder = None
 
     prng = np.random.RandomState(seed)
     start_code = prng.randn(num_samples, 4, h // 8, w // 8)

@@ -2,7 +2,23 @@ import lightning as L
 
 from weights_downloader import ModelDownloadWork
 
+
+class ModelBuildConfig(L.BuildConfig):
+    def build_commands(self):
+        return [
+            "rm -rf stablediffusion",
+            "git clone -b lit https://github.com/aniketmaurya/stablediffusion",
+            "python -m pip install -r stablediffusion/requirements.txt",
+            "python -m pip install -e stablediffusion",
+            "pip uninstall -y opencv-python",
+            "pip uninstall -y opencv-python-headless",
+            "pip install opencv-python-headless==4.5.5.64",
+        ]
+
 class InpaintingServe(ModelDownloadWork):
+    def __init__(self, *args, **kwargs):
+        super().__init__(cloud_compute=L.CloudCompute("gpu-fast"), cloud_build_config=ModelBuildConfig(), download_repo=False, *args, **kwargs)
+
     def run(self, *args, **kwargs):
         config_path = "stablediffusion/configs/stable-diffusion/v2-inpainting-inference.yaml"
         url = "https://huggingface.co/stabilityai/stable-diffusion-2-inpainting/resolve/main/512-inpainting-ema.ckpt"
@@ -10,6 +26,9 @@ class InpaintingServe(ModelDownloadWork):
 
         from sd_components.gradio.inpainting import launch
         launch(config=config_path, ckpt=self.weights_path, port=self.port)
+    
+    def configure_layout(self):
+        return {"name": "Inpainting", "content": self.url}
 
 component = InpaintingServe()
 app = L.LightningApp(component)

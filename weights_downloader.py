@@ -21,8 +21,11 @@ class ModelDownloadWork(L.LightningWork):
     It initializes a model and expose an API to handle incoming requests and generate predictions.
     """
 
-    def __init__(self):
-        super().__init__(cloud_build_config=DiffusionBuildConfig())
+    def __init__(self, download_repo=True, *args, **kwargs):
+        if download_repo:
+            super().__init__(cloud_build_config=DiffusionBuildConfig(), *args, **kwargs)
+        else:
+            super().__init__(*args, **kwargs)
         self.weights_path = None
         self.config_path = None
 

@@ -1,1 +1,2 @@
 lightning
+pytorch-lightning>=1.8.0
