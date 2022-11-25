@@ -1,7 +1,9 @@
 import urllib.request
+import os
 from dataclasses import dataclass
 from pathlib import Path
 import lightning as L  # noqa: E402
+from os.path import basename
 
 
 @dataclass
@@ -34,10 +36,16 @@ class ModelDownloadWork(L.LightningWork):
         weights_folder.mkdir(parents=True, exist_ok=True)
         # url = "https://pl-public-data.s3.amazonaws.com/dream_stable_diffusion/768-v-ema.ckpt"
         # config_path = "stablediffusion/configs/stable-diffusion/v2-inference-v.yaml"
-        weights_path = "sd-weights.ckpt"
-        urllib.request.urlretrieve(weights_url, weights_path)
+        weight_filename = basename(weights_url)
+        weights_path = weight_filename  # "sd-weights.ckpt"
+        if os.path.exists(weights_path):
+            print("model weights already exists")
+        else:
+            print("downloading model weights...")
+            urllib.request.urlretrieve(weights_url, weights_path)
         self.weights_path = weights_path
         self.config_path = config_path
+        print("downloaded weights")
 
     def run(self, weights_url, config_path):
         self.download_weights(weights_url, config_path)
