@@ -17,7 +17,7 @@ class ModelBuildConfig(L.BuildConfig):
 
 class InpaintingServe(ModelDownloadWork):
     def __init__(self, *args, **kwargs):
-        super().__init__(cloud_compute=L.CloudCompute("gpu-fast"), cloud_build_config=ModelBuildConfig(), download_repo=False, *args, **kwargs)
+        super().__init__(cloud_build_config=ModelBuildConfig(), download_repo=False, *args, **kwargs)
 
     def run(self, *args, **kwargs):
         config_path = "stablediffusion/configs/stable-diffusion/v2-inpainting-inference.yaml"
