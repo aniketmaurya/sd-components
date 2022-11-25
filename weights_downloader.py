@@ -9,7 +9,7 @@ class DiffusionBuildConfig(L.BuildConfig):
     def build_commands(self):
         return [
             "rm -rf stablediffusion",
-            "git clone -b main https://github.com/Stability-AI/stablediffusion",
+            "git clone -b lit https://github.com/aniketmaurya/stablediffusion",
             "python -m pip install -r stablediffusion/requirements.txt",
             "python -m pip install -e stablediffusion",
         ]
