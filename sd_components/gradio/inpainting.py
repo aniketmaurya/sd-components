@@ -187,7 +187,7 @@ def launch(config, ckpt, host, port):
                     ddim_steps = gr.Slider(label="Steps", minimum=1,
                                         maximum=50, value=45, step=1)
                     scale = gr.Slider(
-                        label="Guidance Scale", minimum=0.1, maximum=30.0, value=10, step=0.1
+                        label="Guidance Scale", minimum=0.1, maximum=30.0, value=11, step=0.1
                     )
                     seed = gr.Slider(
                         label="Seed",
