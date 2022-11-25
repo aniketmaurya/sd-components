@@ -1,0 +1,1 @@
+from .inpainting_component import InpaintingServe
