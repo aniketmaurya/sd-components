@@ -1,9 +1,10 @@
-import urllib.request
 import os
+import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
-import lightning as L  # noqa: E402
 from os.path import basename
+
+import lightning as L  # noqa: E402
+from lightning.app.storage import Path
 
 
 @dataclass
@@ -43,9 +44,9 @@ class ModelDownloadWork(L.LightningWork):
         else:
             print("downloading model weights...")
             urllib.request.urlretrieve(weights_url, weights_path)
+            print("downloaded weights")
         self.weights_path = weights_path
         self.config_path = config_path
-        print("downloaded weights")
 
     def run(self, weights_url, config_path):
         self.download_weights(weights_url, config_path)
