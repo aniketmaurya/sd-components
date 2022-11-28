@@ -1,15 +1,19 @@
 import sys
-from pathlib import Path
 
 import cv2
-import gradio as gr
 import numpy as np
+import streamlit as st
 import torch
 from einops import repeat
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.util import instantiate_from_config
 from omegaconf import OmegaConf
 from PIL import Image
+from streamlit_drawable_canvas import st_canvas
+
+# from imwatermark import WatermarkEncoder
+
+
 
 torch.set_grad_enabled(False)
 
@@ -22,7 +26,9 @@ def put_watermark(img, wm_encoder=None):
     return img
 
 
+@st.cache(allow_output_mutation=True)
 def initialize_model(config, ckpt):
+    print("loading model")
     config = OmegaConf.load(config)
     model = instantiate_from_config(config.model)
 
@@ -30,8 +36,6 @@ def initialize_model(config, ckpt):
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
     sampler = DDIMSampler(model)
 
     return sampler
@@ -63,7 +67,17 @@ def make_batch_sd(image, mask, txt, device, num_samples=1):
 
 
 def inpaint(
-    sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1, w=512, h=512
+    sampler,
+    image,
+    mask,
+    prompt,
+    seed,
+    scale,
+    ddim_steps,
+    num_samples=1,
+    w=512,
+    h=512,
+    eta=1.0,
 ):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = sampler.model
@@ -78,7 +92,7 @@ def inpaint(
     start_code = prng.randn(num_samples, 4, h // 8, w // 8)
     start_code = torch.from_numpy(start_code).to(device=device, dtype=torch.float32)
 
-    with torch.inference_mode(), torch.autocast("cuda"):
+    with torch.no_grad(), torch.autocast("cuda"):
         batch = make_batch_sd(
             image, mask, txt=prompt, device=device, num_samples=num_samples
         )
@@ -110,7 +124,7 @@ def inpaint(
             shape,
             cond,
             verbose=False,
-            eta=1.0,
+            eta=eta,
             unconditional_guidance_scale=scale,
             unconditional_conditioning=uc_full,
             x_T=start_code,
@@ -126,97 +140,79 @@ def inpaint(
     ]
 
 
-def pad_image(input_image):
-    pad_w, pad_h = (
-        np.max(((2, 2), np.ceil(np.array(input_image.size) / 64).astype(int)), axis=0)
-        * 64
-        - input_image.size
-    )
-    im_padded = Image.fromarray(
-        np.pad(np.array(input_image), ((0, pad_h), (0, pad_w), (0, 0)), mode="edge")
-    )
-    return im_padded
+def launch_ui(app_state):
+    print("launching streamlit")
+    st.title("Stable Diffusion Inpainting")
 
+    sampler = initialize_model(sys.argv[1], sys.argv[2])
 
-class Predict:
-    def __init__(self, sampler) -> None:
-        self.sampler = sampler
+    image = st.file_uploader("Image", ["jpg", "png"])
+    if image:
+        image = Image.open(image)
+        w, h = image.size
+        print(f"loaded input image of size ({w}, {h})")
+        width, height = map(
+            lambda x: x - x % 64, (w, h)
+        )  # resize to integer multiple of 32
+        image = image.resize((width, height))
 
-    def __call__(self, input_image, prompt, ddim_steps, num_samples, scale, seed):
-        init_image = input_image["image"].convert("RGB")
-        init_mask = input_image["mask"].convert("RGB")
+        prompt = st.text_input("Prompt")
 
-        init_image.thumbnail((512, 512))
-        init_mask.thumbnail((512, 512))
-
-        image = pad_image(init_image)  # resize to integer multiple of 32
-        mask = pad_image(init_mask)  # resize to integer multiple of 32
-        width, height = image.size
-        print("Inpainting...", width, height)
-
-        result = inpaint(
-            sampler=self.sampler,
-            image=image,
-            mask=mask,
-            prompt=prompt,
-            seed=seed,
-            scale=scale,
-            ddim_steps=ddim_steps,
-            num_samples=num_samples,
-            h=height,
-            w=width,
+        seed = st.number_input("Seed", min_value=0, max_value=1000000, value=0)
+        num_samples = st.number_input(
+            "Number of Samples", min_value=1, max_value=64, value=1
         )
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        scale = st.slider("Scale", min_value=0.1, max_value=30.0, value=10.0, step=0.1)
+        ddim_steps = st.slider(
+            "DDIM Steps", min_value=0, max_value=50, value=50, step=1
+        )
+        eta = st.sidebar.number_input(
+            "eta (DDIM)", value=0.0, min_value=0.0, max_value=1.0
+        )
 
-        return result
+        fill_color = "rgba(255, 255, 255, 0.0)"
+        stroke_width = st.number_input(
+            "Brush Size", value=64, min_value=1, max_value=100
+        )
+        stroke_color = "rgba(255, 255, 255, 1.0)"
+        bg_color = "rgba(0, 0, 0, 1.0)"
+        drawing_mode = "freedraw"
 
+        st.write("Canvas")
+        st.caption(
+            "Draw a mask to inpaint, then click the 'Send to Streamlit' button (bottom left, with an arrow on it)."
+        )
+        canvas_result = st_canvas(
+            fill_color=fill_color,
+            stroke_width=stroke_width,
+            stroke_color=stroke_color,
+            background_color=bg_color,
+            background_image=image,
+            update_streamlit=False,
+            height=height,
+            width=width,
+            drawing_mode=drawing_mode,
+            key="canvas",
+        )
+        if canvas_result:
+            mask = canvas_result.image_data
+            mask = mask[:, :, -1] > 0
+            if mask.sum() > 0:
+                mask = Image.fromarray(mask)
 
-def launch(config, ckpt, host, port):
-
-    sampler = initialize_model(config, ckpt)
-    predict = Predict(sampler=sampler)
-
-    block = gr.Blocks().queue()
-    with block:
-        with gr.Row():
-            gr.Markdown("## Stable Diffusion Inpainting")
-
-        with gr.Row():
-            with gr.Column():
-                input_image = gr.Image(source="upload", tool="sketch", type="pil")
-                prompt = gr.Textbox(label="Prompt")
-                run_button = gr.Button(label="Run")
-                with gr.Accordion("Advanced options", open=False):
-                    num_samples = gr.Slider(
-                        label="Images", minimum=1, maximum=4, value=4, step=1
-                    )
-                    ddim_steps = gr.Slider(
-                        label="Steps", minimum=1, maximum=50, value=45, step=1
-                    )
-                    scale = gr.Slider(
-                        label="Guidance Scale",
-                        minimum=0.1,
-                        maximum=30.0,
-                        value=11,
-                        step=0.1,
-                    )
-                    seed = gr.Slider(
-                        label="Seed",
-                        minimum=0,
-                        maximum=2147483647,
-                        step=1,
-                        randomize=True,
-                    )
-            with gr.Column():
-                gallery = gr.Gallery(label="Generated images", show_label=False).style(
-                    grid=[2], height="auto"
+                result = inpaint(
+                    sampler=sampler,
+                    image=image,
+                    mask=mask,
+                    prompt=prompt,
+                    seed=seed,
+                    scale=scale,
+                    ddim_steps=ddim_steps,
+                    num_samples=num_samples,
+                    h=height,
+                    w=width,
+                    eta=eta,
                 )
-
-        run_button.click(
-            fn=predict,
-            inputs=[input_image, prompt, ddim_steps, num_samples, scale, seed],
-            outputs=[gallery],
-        )
-
-    block.launch(server_name=host, server_port=port)
+                st.write("Inpainted")
+                for image in result:
+                    st.image(image, output_format="PNG")

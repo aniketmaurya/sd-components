@@ -1,1 +1,1 @@
-from .inpainting_component import InpaintingServe
+from .inpainting_component import InpaintingServe, InpaintingStreamlitServe
